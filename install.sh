@@ -186,16 +186,12 @@ uninstall() {
 
   # Uninstall zotavm
   if command -v zotavm &>/dev/null || [[ -x "${HOME}/.zota/bin/zotavm" ]]; then
-    info "Uninstalling zotavm..."
+    info "Removing dependencies..."
     if command -v curl &>/dev/null; then
-      bash <(curl -fsSL "$ZOTA_INSTALL_URL") --uninstall
+      bash <(curl -fsSL "$ZOTA_INSTALL_URL") --uninstall &>/dev/null
     elif command -v wget &>/dev/null; then
-      bash <(wget -qO- "$ZOTA_INSTALL_URL") --uninstall
-    else
-      warn "curl or wget not found, could not uninstall zotavm automatically"
+      bash <(wget -qO- "$ZOTA_INSTALL_URL") --uninstall &>/dev/null
     fi
-  else
-    info "zotavm not found, skipping"
   fi
 
   echo ""
