@@ -133,6 +133,7 @@ trap cleanup EXIT
 if [[ -z "$VM_ID" ]]; then
   CREATE_ARGS=("$DIR")
   [[ "$NEW_VM" == true ]] && CREATE_ARGS+=(-n)
+  [[ "$VERBOSE" == true ]] && CREATE_ARGS+=(-v)
   [[ -n "$CPUS" ]] && CREATE_ARGS+=(--cpus "$CPUS")
   [[ -n "$MEM" ]]  && CREATE_ARGS+=(--mem "$MEM")
 
