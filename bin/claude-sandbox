@@ -144,6 +144,7 @@ if [[ -z "$VM_ID" ]]; then
     echo "$CREATE_OUTPUT" >&2
     exit 1
   fi
+  [[ "$VERBOSE" == true ]] && echo "$CREATE_OUTPUT" | grep '^\[vm\]' >&2
   vlog "VM create took $(fmt_duration $(( $(now_ms) - create_start )))"
 
   # Extract VM ID from "VM ready: <name> (<id>)"
