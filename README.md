@@ -4,15 +4,9 @@ Run [Claude Code](https://docs.anthropic.com/en/docs/claude-code) inside isolate
 
 Claude runs with `--dangerously-skip-permissions` since the VM itself provides the sandbox boundary.
 
-## Prerequisites
-
-Install [zotavm](https://github.com/ataul443/zota):
-
-```bash
-curl -sSL https://zota.dev/install.sh | bash
-```
-
 ## Install
+
+[zotavm](https://github.com/ataul443/zota) is installed automatically if not already present.
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/ataul443/claudesandbox/main/install.sh | bash

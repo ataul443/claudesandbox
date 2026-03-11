@@ -8,9 +8,7 @@
 #   --uninstall   Remove claude-sandbox
 #   --help        Show this help message
 #
-# Prerequisites:
-#   zotavm must be installed. Install it with:
-#     curl -sSL https://zota.dev/install.sh | bash
+# zotavm is installed automatically if not already present.
 
 set -euo pipefail
 
@@ -49,13 +47,13 @@ Options:
     --uninstall   Remove claude-sandbox
     --help        Show this help message
 
-Prerequisites:
-    zotavm must be installed first:
-      curl -sSL https://zota.dev/install.sh | bash
+zotavm is installed automatically if not already present.
 EOF
 }
 
-check_zotavm() {
+ZOTA_INSTALL_URL="https://raw.githubusercontent.com/ataul443/zota/dev/install.sh"
+
+ensure_zotavm() {
   if command -v zotavm &>/dev/null; then
     info "Found zotavm at $(command -v zotavm)"
     return 0
@@ -67,13 +65,25 @@ check_zotavm() {
     return 0
   fi
 
-  error "zotavm is not installed."
+  info "zotavm not found, installing it now..."
   echo ""
-  echo "  Install it first with:"
-  echo ""
-  echo "    curl -sSL https://zota.dev/install.sh | bash"
-  echo ""
-  exit 1
+
+  if command -v curl &>/dev/null; then
+    bash <(curl -fsSL "$ZOTA_INSTALL_URL")
+  elif command -v wget &>/dev/null; then
+    bash <(wget -qO- "$ZOTA_INSTALL_URL")
+  else
+    error "curl or wget is required to install zotavm"
+    exit 1
+  fi
+
+  # Verify it installed
+  if command -v zotavm &>/dev/null || [[ -x "${HOME}/.zota/bin/zotavm" ]]; then
+    success "zotavm installed successfully"
+  else
+    error "zotavm installation failed"
+    exit 1
+  fi
 }
 
 download() {
@@ -93,7 +103,7 @@ install() {
   echo -e "${BOLD}Claude Sandbox installer${NC}"
   echo ""
 
-  check_zotavm
+  ensure_zotavm
 
   mkdir -p "$INSTALL_DIR"
 
