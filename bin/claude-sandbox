@@ -22,8 +22,8 @@ set -euo pipefail
 ZOTAVM="zotavm"
 DIR="$(pwd)"
 VM_ID=""
-CPUS=""
-MEM=""
+CPUS="4"
+MEM="2048"
 NEW_VM=false
 DESTROY=false
 VERBOSE=false
