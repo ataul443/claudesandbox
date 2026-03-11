@@ -162,6 +162,7 @@ uninstall() {
   echo -e "${BOLD}Uninstalling claude-sandbox${NC}"
   echo ""
 
+  # Remove the binary
   if [[ -f "$INSTALL_DIR/claude-sandbox" ]]; then
     rm -f "$INSTALL_DIR/claude-sandbox"
     success "Removed $INSTALL_DIR/claude-sandbox"
@@ -169,7 +170,46 @@ uninstall() {
     warn "claude-sandbox not found at $INSTALL_DIR/claude-sandbox"
   fi
 
-  warn "You may want to remove the PATH entry from your shell profile."
+  # Remove PATH entry from shell profiles
+  local profiles=(
+    "$HOME/.zshrc"
+    "$HOME/.bashrc"
+    "$HOME/.bash_profile"
+    "$HOME/.profile"
+    "$HOME/.config/fish/config.fish"
+  )
+  for profile in "${profiles[@]}"; do
+    if [[ -f "$profile" ]] && grep -q "# claude-sandbox" "$profile" 2>/dev/null; then
+      # Remove the claude-sandbox block (comment + export/set line)
+      sed -i.bak '/# claude-sandbox/,+1d' "$profile" && rm -f "${profile}.bak"
+      # Remove any leftover blank lines at end of file
+      sed -i.bak -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$profile" && rm -f "${profile}.bak"
+      success "Removed PATH entry from $profile"
+    fi
+  done
+
+  # Remove INSTALL_DIR if empty
+  if [[ -d "$INSTALL_DIR" ]] && [[ -z "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]]; then
+    rmdir "$INSTALL_DIR"
+    success "Removed empty directory $INSTALL_DIR"
+  fi
+
+  # Uninstall zotavm
+  if command -v zotavm &>/dev/null || [[ -x "${HOME}/.zota/bin/zotavm" ]]; then
+    info "Uninstalling zotavm..."
+    if command -v curl &>/dev/null; then
+      bash <(curl -fsSL "$ZOTA_INSTALL_URL") --uninstall
+    elif command -v wget &>/dev/null; then
+      bash <(wget -qO- "$ZOTA_INSTALL_URL") --uninstall
+    else
+      warn "curl or wget not found, could not uninstall zotavm automatically"
+    fi
+  else
+    info "zotavm not found, skipping"
+  fi
+
+  echo ""
+  success "claude-sandbox has been fully uninstalled."
   echo ""
 }
 
