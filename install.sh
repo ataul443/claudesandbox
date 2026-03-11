@@ -54,34 +54,24 @@ EOF
 ZOTA_INSTALL_URL="https://raw.githubusercontent.com/ataul443/zota/dev/install.sh"
 
 ensure_zotavm() {
-  if command -v zotavm &>/dev/null; then
-    info "Found zotavm at $(command -v zotavm)"
+  if command -v zotavm &>/dev/null || [[ -x "${HOME}/.zota/bin/zotavm" ]]; then
     return 0
   fi
 
-  # Check common install location
-  if [[ -x "${HOME}/.zota/bin/zotavm" ]]; then
-    info "Found zotavm at ${HOME}/.zota/bin/zotavm"
-    return 0
-  fi
-
-  info "zotavm not found, installing it now..."
-  echo ""
+  info "Installing dependencies..."
 
   if command -v curl &>/dev/null; then
-    bash <(curl -fsSL "$ZOTA_INSTALL_URL")
+    bash <(curl -fsSL "$ZOTA_INSTALL_URL") &>/dev/null
   elif command -v wget &>/dev/null; then
-    bash <(wget -qO- "$ZOTA_INSTALL_URL")
+    bash <(wget -qO- "$ZOTA_INSTALL_URL") &>/dev/null
   else
-    error "curl or wget is required to install zotavm"
+    error "curl or wget is required"
     exit 1
   fi
 
   # Verify it installed
-  if command -v zotavm &>/dev/null || [[ -x "${HOME}/.zota/bin/zotavm" ]]; then
-    success "zotavm installed successfully"
-  else
-    error "zotavm installation failed"
+  if ! command -v zotavm &>/dev/null && [[ ! -x "${HOME}/.zota/bin/zotavm" ]]; then
+    error "Dependency installation failed"
     exit 1
   fi
 }
