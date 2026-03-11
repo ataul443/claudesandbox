@@ -12,6 +12,7 @@ set -euo pipefail
 #   --cpus <n>          vCPUs for new VM (default: smolvm default)
 #   --mem <MiB>         Memory for new VM (default: smolvm default)
 #   --destroy           Destroy the VM after claude exits
+#   -v, --verbose       Show timing for each step
 #   -h, --help          Show this help
 #
 # If no --id is given, a new VM is created from the directory.
@@ -23,10 +24,51 @@ VM_ID=""
 CPUS=""
 MEM=""
 DESTROY=false
+VERBOSE=false
 CLAUDE_ARGS=()
 
+# Get current time in milliseconds (portable: works on macOS and Linux)
+now_ms() {
+  perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000' 2>/dev/null \
+    || echo $(( $(date +%s) * 1000 ))
+}
+
+# Format milliseconds into human-readable duration
+fmt_duration() {
+  local total_ms=$1
+  local s=$(( total_ms / 1000 ))
+  local ms=$(( total_ms % 1000 ))
+  if (( s >= 60 )); then
+    local m=$(( s / 60 ))
+    s=$(( s % 60 ))
+    printf '%dm %d.%03ds' "$m" "$s" "$ms"
+  elif (( s > 0 )); then
+    printf '%d.%03ds' "$s" "$ms"
+  else
+    printf '%dms' "$ms"
+  fi
+}
+
+# Print a log message (only in verbose mode)
+vlog() { [[ "$VERBOSE" == true ]] && echo "[sandbox] $*" >&2 || true; }
+
+# Run a command and report how long it took (verbose only)
+timed() {
+  local label="$1"; shift
+  if [[ "$VERBOSE" != true ]]; then
+    "$@"
+    return $?
+  fi
+  local start; start=$(now_ms)
+  "$@"
+  local rc=$?
+  local end; end=$(now_ms)
+  vlog "$label took $(fmt_duration $(( end - start )))"
+  return $rc
+}
+
 show_help() {
-  sed -n '3,17p' "$0" | sed 's/^# \?//'
+  sed -n '3,18p' "$0" | sed 's/^# \?//'
   exit 0
 }
 
@@ -39,19 +81,26 @@ while [[ $# -gt 0 ]]; do
     --cpus)       CPUS="$2"; shift 2 ;;
     --mem)        MEM="$2"; shift 2 ;;
     --destroy)    DESTROY=true; shift ;;
+    -v|--verbose) VERBOSE=true; shift ;;
     --)           shift; CLAUDE_ARGS=("$@"); break ;;
     *)            CLAUDE_ARGS=("$@"); break ;;
   esac
 done
 
+if [[ ! -d "$DIR" ]]; then
+  echo "Error: Directory does not exist: $DIR" >&2
+  exit 1
+fi
 DIR="$(cd "$DIR" && pwd)"
 
 cleanup() {
   if [[ -n "$VM_ID" ]]; then
     if [[ "$DESTROY" == true ]]; then
-      "$ZOTAVM" destroy "$VM_ID" &>/dev/null || true
+      vlog "Destroying VM $VM_ID..."
+      timed "VM destroy" "$ZOTAVM" destroy "$VM_ID" || echo "Warning: Failed to destroy VM $VM_ID" >&2
     else
-      "$ZOTAVM" stop "$VM_ID" &>/dev/null || true
+      vlog "Stopping VM $VM_ID..."
+      timed "VM stop" "$ZOTAVM" stop "$VM_ID" || echo "Warning: Failed to stop VM $VM_ID" >&2
     fi
   fi
 }
@@ -63,16 +112,24 @@ if [[ -z "$VM_ID" ]]; then
   [[ -n "$CPUS" ]] && CREATE_ARGS+=(--cpus "$CPUS")
   [[ -n "$MEM" ]]  && CREATE_ARGS+=(--mem "$MEM")
 
-  CREATE_OUTPUT="$("$ZOTAVM" create "${CREATE_ARGS[@]}" 2>&1)"
+  vlog "Creating VM from $DIR..."
+  create_start=$(now_ms)
+  if ! CREATE_OUTPUT="$("$ZOTAVM" create "${CREATE_ARGS[@]}" 2>&1)"; then
+    echo "Error: Failed to create VM" >&2
+    echo "$CREATE_OUTPUT" >&2
+    exit 1
+  fi
+  vlog "VM create took $(fmt_duration $(( $(now_ms) - create_start )))"
 
   # Extract VM ID from "VM ready: <name> (<id>)"
   VM_ID="$(echo "$CREATE_OUTPUT" | grep -oE '\([a-f0-9]+\)' | head -1 | tr -d '()')"
 
   if [[ -z "$VM_ID" ]]; then
-    echo "Error: Failed to create VM" >&2
+    echo "Error: VM created but could not extract VM ID from output:" >&2
     echo "$CREATE_OUTPUT" >&2
     exit 1
   fi
+  vlog "VM ready: $VM_ID"
 fi
 
 # Build claude command with args — skip permissions since it's sandboxed
@@ -84,4 +141,5 @@ if [[ ${#CLAUDE_ARGS[@]} -gt 0 ]]; then
 fi
 
 # Run claude interactively inside the VM via zotavm shell
-"$ZOTAVM" shell "$VM_ID" -- $CLAUDE_CMD
+vlog "Launching claude in VM $VM_ID..."
+timed "Claude session" "$ZOTAVM" shell "$VM_ID" -- $CLAUDE_CMD
